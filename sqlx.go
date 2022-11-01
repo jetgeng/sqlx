@@ -34,6 +34,8 @@ var mpr *reflectx.Mapper
 // mprMu protects mpr.
 var mprMu sync.Mutex
 
+type NameTransfer func(string) string
+
 // mapper returns a valid mapper using the configured NameMapper func.
 func mapper() *reflectx.Mapper {
 	mprMu.Lock()
@@ -591,6 +593,10 @@ func (r *Rows) MapScan(dest map[string]interface{}) error {
 	return MapScan(r, dest)
 }
 
+func (r *Rows) MapScanWithTr(dest map[string]interface{}, tr NameTransfer) error {
+	return MapScanWithTr(r, dest, tr)
+}
+
 // StructScan is like sql.Rows.Scan, but scans a single Row into a single Struct.
 // Use this and iterate over Rows manually when the memory load of Select() might be
 // prohibitive.  *Rows.StructScan caches the reflect work of matching up column
@@ -833,6 +839,10 @@ func SliceScan(r ColScanner) ([]interface{}, error) {
 // each other!
 func MapScan(r ColScanner, dest map[string]interface{}) error {
 	// ignore r.started, since we needn't use reflect for anything.
+	return MapScanWithTr(r, dest, func(in string) string { return in })
+}
+
+func MapScanWithTr(r ColScanner, dest map[string]interface{}, tr NameTransfer) error {
 	columns, err := r.Columns()
 	if err != nil {
 		return err
@@ -849,7 +859,7 @@ func MapScan(r ColScanner, dest map[string]interface{}) error {
 	}
 
 	for i, column := range columns {
-		dest[column] = *(values[i].(*interface{}))
+		dest[tr(column)] = *(values[i].(*interface{}))
 	}
 
 	return r.Err()
